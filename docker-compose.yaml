@@ -1,0 +1,119 @@
+version: '3.7'
+
+services:
+  zipkin-server:
+    image: openzipkin/zipkin:latest
+    ports:
+      - "9411:9411"
+    networks:
+      - currency-network
+    depends_on:
+      - rabbitmq
+    environment:
+      RABBIT_URI: "amqp://guest:guest@rabbitmq:5672"
+    deploy:
+      resources:
+        limits:
+          memory: 300m
+
+  config-server:
+    image: alvaropb/config-server:latest
+    ports:
+      - "8888:8888"
+    networks:
+      - currency-network
+    deploy:
+      resources:
+        limits:
+          memory: 300m
+
+  naming-server:
+    image: alvaropb/naming-server:latest
+    ports:
+      - "8761:8761"
+    networks:
+      - currency-network
+    deploy:
+      resources:
+        limits:
+          memory: 300m
+
+  api-gateway:
+    image: alvaropb/api-gateway:latest
+    ports:
+      - "8765:8765"
+    networks:
+      - currency-network
+    depends_on:
+      - naming-server
+      - config-server
+      - zipkin-server
+      - rabbitmq
+    environment:
+      SPRING.CONFIG.IMPORT: "optional:configserver:http://config-server:8888"
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: "http://naming-server:8761/eureka"
+      SPRING.ZIPKIN.BASEURL: "http://zipkin-server:9411/"
+      RABBIT_URI: "amqp://guest:guest@rabbitmq:5672"
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+    deploy:
+      resources:
+        limits:
+          memory: 300m
+
+  currency-exchange:
+    image: alvaropb/currency-exchange-service:latest
+    ports:
+      - "8000:8000"
+    networks:
+      - currency-network
+    depends_on:
+      - naming-server
+      - config-server
+      - zipkin-server
+      - rabbitmq
+    environment:
+      SPRING.CONFIG.IMPORT: "optional:configserver:http://config-server:8888"
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: "http://naming-server:8761/eureka"
+      SPRING.ZIPKIN.BASEURL: "http://zipkin-server:9411/"
+      RABBIT_URI: "amqp://guest:guest@rabbitmq:5672"
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+    deploy:
+      resources:
+        limits:
+          memory: 300m
+
+  currency-conversion:
+    image: alvaropb/currency-conversion-service:latest
+    ports:
+      - "8100:8100"
+    networks:
+      - currency-network
+    depends_on:
+      - naming-server
+      - config-server
+      - zipkin-server
+      - rabbitmq
+    environment:
+      SPRING.CONFIG.IMPORT: "optional:configserver:http://config-server:8888"
+      EUREKA.CLIENT.SERVICEURL.DEFAULTZONE: "http://naming-server:8761/eureka"
+      SPRING.ZIPKIN.BASEURL: "http://zipkin-server:9411/"
+      RABBIT_URI: "amqp://guest:guest@rabbitmq:5672"
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_ZIPKIN_SENDER_TYPE: rabbit
+    deploy:
+      resources:
+        limits:
+          memory: 300m
+
+  rabbitmq:
+    image: rabbitmq:latest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - currency-network
+
+networks:
+  currency-network:
